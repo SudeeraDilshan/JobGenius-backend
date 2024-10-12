@@ -1,30 +1,28 @@
 import ballerina/http;
 import ballerina/uuid;
 import ballerinax/mongodb;
+import ballerina/io;
 
-mongodb:Client mongoDb = check new ({
-    connection: {
-        serverAddress: {
-            host: "localhost",
-            port: 27017
-        }
-    // Uncomment and update the auth details if needed
-    // auth: {
-    //     username: "teamdacker",
-    //     password: "TeamDacker123",
-    //     database: "JobGeniusDb"
-    // }
-    }
-});
+
+mongodb:ConnectionConfig mongoConfig = {
+    connection: "mongodb+srv://janithravisankax:oId7hMtN4eME17ok@cluster0.k6xoa.mongodb.net/"
+};
+
+mongodb:Client mongoDb = check new (mongoConfig);
+
 
 service /api on new http:Listener(9090) {
     private final mongodb:Database JobGeniusDb;
 
     function init() returns error? {
+        
+        string[] dbs = check mongoDb->listDatabaseNames();
+        io:println("Available databases: ", dbs);
+        
         self.JobGeniusDb = check mongoDb->getDatabase("JobGeniusDb");
     }
 
-    resource function get jobs() returns Job[]|error {
+    resource function get jobs(@http:Query Filter? filter) returns Job[]|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
         stream<Job, error?> result = check jobs->find();
         return from Job job in result

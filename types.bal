@@ -31,3 +31,14 @@ public type Job record {|
     string description;
     string company;
 |};
+
+public type Filter record {|
+    string position?;
+    string category?;
+    string engagement?;
+    string working_mode?;
+    string location?;
+    string salary?;
+    string description?;
+    string company?;
+|};
