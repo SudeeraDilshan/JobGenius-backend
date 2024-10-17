@@ -38,3 +38,14 @@ public type Job record {|
     string experience;
     string keypoints;
 |};
+
+
+public type Filter record{|
+    string[] position?;
+    string[] category?;
+    string[] engagement?;
+    string[] working_mode?;
+    string[] location?;
+    int salary?;
+    string[] company?;
+|};

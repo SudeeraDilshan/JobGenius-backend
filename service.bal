@@ -1,40 +1,58 @@
 import ballerina/http;
 import ballerina/uuid;
 import ballerinax/mongodb;
+import ballerina/io;
 
-mongodb:Client mongoDb = check new ({
-    connection: {
-        serverAddress: {
-            host: "localhost",
-            port: 27017
-        }
-    // Uncomment and update the auth details if needed
-    // auth: {
-    //     username: "teamdacker",
-    //     password: "TeamDacker123",
-    //     database: "JobGeniusDb"
-    // }
-    }
-});
+// mongodb:Client mongoDb = check new ({
+//     connection: {
+//         serverAddress: {
+//             host: "localhost",
+//             port: 27017
+//         }
+//     // Uncomment and update the auth details if needed
+//     // auth: {
+//     //     username: "teamdacker",
+//     //     password: "TeamDacker123",
+//     //     database: "JobGeniusDb"
+//     // }
+//     }
+// });
 
-@http:ServiceConfig {
-    cors: {
-        allowOrigins: ["http://localhost:5173"]
-    }
-}
+mongodb:ConnectionConfig mongoConfig = {
+    connection: "mongodb+srv://janithravisankax:oId7hMtN4eME17ok@cluster0.k6xoa.mongodb.net/"
+};
+
+mongodb:Client mongoDb = check new (mongoConfig);
 
 service /api on new http:Listener(9090) {
     private final mongodb:Database JobGeniusDb;
 
     function init() returns error? {
+        string[] dbs = check mongoDb->listDatabaseNames();
+        io:println(dbs);
         self.JobGeniusDb = check mongoDb->getDatabase("JobGeniusDb");
     }
 
-    resource function get jobs() returns Job[]|error {
-        mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
-        stream<Job, error?> result = check jobs->find();
-        return from Job job in result
-            select job;
+    resource function get jobs(
+        @http:Query string[]? category,
+        @http:Query int? salary,
+        @http:Query string[]? position,
+        @http:Query string[]? engagement,
+        @http:Query string[]? working_mode,
+        @http:Query string[]? location,
+        @http:Query string[]? company
+    ) returns Job[]|error {
+        Filter filter = {
+            category: category==[""]?[]:category,
+            salary: salary==()?0:salary,
+            position: position==[""]?[]:position,
+            engagement: engagement==[""]?[]:engagement,
+            working_mode: working_mode==[""]?[]:working_mode,
+            location: location==[""]?[]:location,
+            company: company==[""]?[]:company
+        };
+
+        return searchJobs(self.JobGeniusDb, filter);
     }
 
     resource function post jobs(@http:Payload JobInput jobInput) returns Job|error {
@@ -87,5 +105,21 @@ isolated function getJob(mongodb:Database JobGeniusDb, string id) returns Job|er
         return error("Failed to find a job with id " + id);
     }
     return result;
+}
+
+isolated function searchJobs(mongodb:Database JobGeniusDb, Filter filter) returns Job[]|error{
+    mongodb:Collection jobs = check JobGeniusDb->getCollection("Jobs");
+    stream<Job, error?> result = check jobs->find({
+        position: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
+        category: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
+        engaement: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
+        working_mode: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
+        location: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
+        salary: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
+        company: filter.position==[]?{"$nin":[]}:{"$in":filter.position}
+    });
+
+    return from Job job in result
+           select job;
 }
 
