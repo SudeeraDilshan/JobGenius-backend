@@ -3,21 +3,6 @@ import ballerina/uuid;
 import ballerinax/mongodb;
 import ballerina/io;
 
-// mongodb:Client mongoDb = check new ({
-//     connection: {
-//         serverAddress: {
-//             host: "localhost",
-//             port: 27017
-//         }
-//     // Uncomment and update the auth details if needed
-//     // auth: {
-//     //     username: "teamdacker",
-//     //     password: "TeamDacker123",
-//     //     database: "JobGeniusDb"
-//     // }
-//     }
-// });
-
 mongodb:ConnectionConfig mongoConfig = {
     connection: "mongodb+srv://janithravisankax:oId7hMtN4eME17ok@cluster0.k6xoa.mongodb.net/"
 };
@@ -66,9 +51,9 @@ service /api on new http:Listener(9090) {
             location: jobInput.location,
             salary: jobInput.salary,
             description: jobInput.description,
-            company: jobInput.company
-            // experience: "2 years",
-            // keypoints: "Java, Spring Boot, Microservices"
+            company: jobInput.company,
+            experience: "2 years",
+            keypoints: "Java, Spring Boot, Microservices"
         };
         check jobs->insertOne(job);
         return job;
@@ -113,7 +98,7 @@ isolated function searchJobs(mongodb:Database JobGeniusDb, Filter filter) return
     stream<Job, error?> result = check jobs->find({
         position: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
         category: filter.category==[]?{"$nin":[]}:{"$in":filter.category},
-        engaement: filter.engagement==[]?{"$nin":[]}:{"$in":filter.engagement},
+        engagement: filter.engagement==[]?{"$nin":[]}:{"$in":filter.engagement},
         working_mode: filter.working_mode==[]?{"$nin":[]}:{"$in":filter.working_mode},
         location: filter.location==[]?{"$nin":[]}:{"$in":filter.location},
         salary: filter.salary==()?{"$nin":[]}:{"$gt":filter.salary},
