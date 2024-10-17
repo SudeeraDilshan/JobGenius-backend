@@ -17,6 +17,12 @@ mongodb:Client mongoDb = check new ({
     }
 });
 
+@http:ServiceConfig {
+    cors: {
+        allowOrigins: ["http://localhost:5173"]
+    }
+}
+
 service /api on new http:Listener(9090) {
     private final mongodb:Database JobGeniusDb;
 
@@ -42,7 +48,9 @@ service /api on new http:Listener(9090) {
             location: jobInput.location,
             salary: jobInput.salary,
             description: jobInput.description,
-            company: jobInput.company
+            company: jobInput.company,
+            experience: "2 years",
+            keypoints: "Java, Spring Boot, Microservices"
         };
         check jobs->insertOne(job);
         return job;
@@ -80,3 +88,4 @@ isolated function getJob(mongodb:Database JobGeniusDb, string id) returns Job|er
     }
     return result;
 }
+

@@ -6,7 +6,10 @@ public type JobInput record {|
     string location;
     string salary;
     string description;
-    string company;    
+    string company;
+    string experience;
+    string keypoints;
+        
 |};
 
 public type JobUpdate record {|
@@ -18,6 +21,8 @@ public type JobUpdate record {|
     string salary?;
     string description?;
     string company?;  
+    string experience?;
+    string keypoints?;
 |};
 
 public type Job record {|
@@ -30,4 +35,6 @@ public type Job record {|
     string salary;
     string description;
     string company;
+    string experience;
+    string keypoints;
 |};
