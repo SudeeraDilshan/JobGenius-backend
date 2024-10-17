@@ -4,11 +4,11 @@ public type JobInput record {|
     string engagement;
     string working_mode;
     string location;
-    string salary;
+    int salary;
     string description;
     string company;
-    string experience;
-    string keypoints;
+    // string experience;
+    // string keypoints;
         
 |};
 
@@ -18,25 +18,25 @@ public type JobUpdate record {|
     string engagement?;
     string working_mode?;
     string location?;
-    string salary?;
+    int salary?;
     string description?;
     string company?;  
-    string experience?;
-    string keypoints?;
+    // string experience?;
+    // string keypoints?;
 |};
 
 public type Job record {|
     readonly string id;
-    string position;
-    string category;
-    string engagement;
-    string working_mode;
-    string location;
-    string salary;
-    string description;
-    string company;
-    string experience;
-    string keypoints;
+    string position?;
+    string category?;
+    string engagement?;
+    string working_mode?;
+    string location?;
+    int salary?;
+    string description?;
+    string company?;
+    // string experience?;
+    // string keypoints?;
 |};
 
 

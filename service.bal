@@ -66,9 +66,9 @@ service /api on new http:Listener(9090) {
             location: jobInput.location,
             salary: jobInput.salary,
             description: jobInput.description,
-            company: jobInput.company,
-            experience: "2 years",
-            keypoints: "Java, Spring Boot, Microservices"
+            company: jobInput.company
+            // experience: "2 years",
+            // keypoints: "Java, Spring Boot, Microservices"
         };
         check jobs->insertOne(job);
         return job;
@@ -109,14 +109,15 @@ isolated function getJob(mongodb:Database JobGeniusDb, string id) returns Job|er
 
 isolated function searchJobs(mongodb:Database JobGeniusDb, Filter filter) returns Job[]|error{
     mongodb:Collection jobs = check JobGeniusDb->getCollection("Jobs");
+    io:println(filter);
     stream<Job, error?> result = check jobs->find({
         position: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
-        category: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
-        engaement: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
-        working_mode: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
-        location: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
-        salary: filter.position==[]?{"$nin":[]}:{"$in":filter.position},
-        company: filter.position==[]?{"$nin":[]}:{"$in":filter.position}
+        category: filter.category==[]?{"$nin":[]}:{"$in":filter.category},
+        engaement: filter.engagement==[]?{"$nin":[]}:{"$in":filter.engagement},
+        working_mode: filter.working_mode==[]?{"$nin":[]}:{"$in":filter.working_mode},
+        location: filter.location==[]?{"$nin":[]}:{"$in":filter.location},
+        salary: filter.salary==()?{"$nin":[]}:{"$gt":filter.salary},
+        company: filter.company==[]?{"$nin":[]}:{"$in":filter.company}
     });
 
     return from Job job in result
