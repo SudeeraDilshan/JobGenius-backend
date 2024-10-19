@@ -96,7 +96,7 @@ service /api on new http:Listener(9090) {
         stream<Job, error?> jobsStream = check jobs->find({company: company});
         json[] jobArray = [];
 
-        error? e = jobsStream.forEach(function(Job job) {
+        check jobsStream.forEach(function(Job job) {
             jobArray.push(job);
         });
 
