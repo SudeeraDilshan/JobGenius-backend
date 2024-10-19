@@ -2,9 +2,31 @@ import ballerina/http;
 import ballerina/io;
 import ballerina/uuid;
 import ballerinax/mongodb;
+import ballerinax/pinecone.vector;
+import ballerinax/azure.openai.embeddings;
+
+
+configurable string pineConeApiKey = ?;
+configurable string pineCodeServiceUrl = ?;
+configurable string AzureEmbeddingsApiKey = ?;
+configurable string AzureEmbeddingsServiceUrl = ?;
+configurable string mongodbConnectionUrl = ?;
+
+
+
+vector:Client pineconeVectorClient = check new ({
+    apiKey: pineConeApiKey
+}, serviceUrl = pineCodeServiceUrl);
+
+final embeddings:Client embeddingsClient = check new (
+    config = {auth: {apiKey: AzureEmbeddingsApiKey}},
+    serviceUrl = AzureEmbeddingsServiceUrl
+);
+
+
 
 mongodb:ConnectionConfig mongoConfig = {
-    connection: "mongodb+srv://janithravisankax:oId7hMtN4eME17ok@cluster0.k6xoa.mongodb.net/"
+    connection: mongodbConnectionUrl
 };
 
 mongodb:Client mongoDb = check new (mongoConfig);
@@ -105,6 +127,10 @@ service /api on new http:Listener(9090) {
         return jobArray;
     }
 
+    resource function post queryJobs(@http:Payload string text) returns Job[]|error {
+        return queryVectorDb(text);
+    }
+
 }
 
 isolated function getJob(mongodb:Database JobGeniusDb, string id) returns Job|error {
@@ -132,3 +158,46 @@ isolated function searchJobs(mongodb:Database JobGeniusDb, Filter filter) return
         select job;
 }
 
+
+
+// query the pinecone vector service
+function queryVectorDb(string text) returns Job[]|error {
+    string question = text;
+
+    embeddings:Deploymentid_embeddings_body embeddingsBody = {
+        input: question,
+        model: "text-embedding-ada-002"
+    };
+    embeddings:Inline_response_200 embeddingsResult = check embeddingsClient->/deployments/["text-embedding-ada-002"]/embeddings.post("2023-05-15", embeddingsBody);
+        vector:VectorData  v = [];
+    foreach decimal i in embeddingsResult.data[0].embedding{
+        v.push(<float>i);
+    }
+    vector:QueryResponse queryResponse = check pineconeVectorClient->/query.post({vector: v, topK: 10, includeMetadata: true});
+
+    json[] data = check queryResponse.matches.toJson().ensureType();
+
+    Job[] jobs = [];
+    foreach var item in data {
+        json job = check item.metadata;
+        jobs.push({
+            id: check job.id,
+            position: check job.position,
+            category: check job.category,
+            engagement: check job.engagement,
+            working_mode: check job.working_mode,
+            location: check job.location,
+            salary: check job.salary,
+            description: check job.description,
+            company: check job.company,
+            experience: check job.experience,
+            keypoints: check job.keypoints
+        });
+
+
+        
+    }
+
+    return jobs;
+
+}
