@@ -40,12 +40,18 @@ public type Job record {|
 |};
 
 
+
+
 public type Filter record{|
     string[] position?;
     string[] category?;
     string[] engagement?;
     string[] working_mode?;
-    string[] location?;
-    int salary?;
-    string[] company?;
+    string location?;
+    // int salary?;
+    string company?;
+|};
+
+public type S record {|
+    string position;
 |};
