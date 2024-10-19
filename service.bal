@@ -113,13 +113,19 @@ service /api on new http:Listener(9090) {
         return getJob(self.JobGeniusDb, id);
     }
 
-    resource function delete jobs/[string id]() returns http:Ok|error {
+    resource function delete jobs/[string id]() returns vector:DeleteResponse|http:Ok|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
-        var deleteResult = check jobs->deleteOne({id: id});
+
+        //delete from mongodb
+        var deleteResult = check jobs->deleteOne({id: id});   
+
+        //delete from pinecone 
+        vector:DeleteResponse delVec = check deleteJobFromPinecone(id);
         if (deleteResult.deletedCount == 0) {
             return error("Failed to delete the job with id " + id);
         }
-        return http:OK;
+
+        return delVec;
     }
 
     resource function get getJobsByCompany(@http:Query string? company = "TechCore") returns json|error {
@@ -209,7 +215,14 @@ function queryVectorDb(string text) returns Job[]|error {
     }
 
     return jobs;
+}
 
+function deleteJobFromPinecone(string id) returns vector:DeleteResponse|error {
+    vector:DeleteRequest deleteRequest = {
+        ids:[id]
+    };
+    vector:DeleteResponse queryResponse = check pineconeVectorClient->/vectors/delete.post(deleteRequest);
+    return queryResponse;
 }
 
 function addVectorToPinecone(TextEmbeddingMetadata[] vectorResult) returns error? {
@@ -241,6 +254,13 @@ isolated function getEmbeddings(string query) returns decimal[]|error {
     embeddings:Inline_response_200 embeddingsResult = check embeddingsClient->/deployments/["text-embedding-ada-002"]/embeddings.post("2023-05-15", embeddingsBody);
     return embeddingsResult.data[0].embedding;
 }
+
+// function queryByID(string id) returns string|error{
+//     vector:QueryResponse queryResponse = check pineconeVectorClient->/query.post({"metadata": {id: id}, topK: 1, includeMetadata: true});
+//     json[] data = check queryResponse.matches.toJson().ensureType();
+//     string id2 = check data[0].metadata.id;
+//     return id2;
+// }
 
 isolated function generateTextForEmbeddings(Job job) returns TextEmbeddingMetadata|error {
 
@@ -290,3 +310,4 @@ isolated function generateTextForEmbeddings(Job job) returns TextEmbeddingMetada
 
 
 }
+
