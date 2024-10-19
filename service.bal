@@ -71,8 +71,13 @@ service /api on new http:Listener(9090) {
 
     resource function post jobs(@http:Payload JobInput jobInput) returns Job|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
+
+        string id = uuid:createType1AsString();
+
+        
+
         Job job = {
-            id: uuid:createType1AsString(),
+            id: id,
             position: jobInput.position,
             category: jobInput.category,
             engagement: jobInput.engagement,
@@ -84,6 +89,11 @@ service /api on new http:Listener(9090) {
             experience: "2 years",
             keypoints: "Java, Spring Boot, Microservices"
         };
+
+        TextEmbeddingMetadata jobText = check generateTextForEmbeddings(job);
+
+        check addVectorToPinecone([jobText]);
+
         io:println(job);
         check jobs->insertOne(job);
         return job;
@@ -199,5 +209,84 @@ function queryVectorDb(string text) returns Job[]|error {
     }
 
     return jobs;
+
+}
+
+function addVectorToPinecone(TextEmbeddingMetadata[] vectorResult) returns error? {
+    vector:Vector[] vector = [];
+    foreach var item in vectorResult {
+        vector:VectorData v =  item.embeddings;
+        vector:VectorMetadata metadata =  item.metadata;
+
+        string uuid1String = uuid:createType1AsString();
+
+        vector:Vector vectorData = {
+            id: uuid1String,
+            values: v,
+            metadata: metadata
+        };
+        vector.push(vectorData);
+
+    }
+    vector:UpsertResponse queryResponse = check pineconeVectorClient->/vectors/upsert.post({vectors: vector});
+    io:println(queryResponse);
+}
+
+
+isolated function getEmbeddings(string query) returns decimal[]|error {
+    embeddings:Deploymentid_embeddings_body embeddingsBody = {
+        input: query,
+        model: "text-embedding-ada-002"
+    };
+    embeddings:Inline_response_200 embeddingsResult = check embeddingsClient->/deployments/["text-embedding-ada-002"]/embeddings.post("2023-05-15", embeddingsBody);
+    return embeddingsResult.data[0].embedding;
+}
+
+isolated function generateTextForEmbeddings(Job job) returns TextEmbeddingMetadata|error {
+
+    vector:VectorMetadata metadata ={
+        "id": job.id,
+        "position": job.position,
+        "category": job.category,
+        "engagement": job.engagement,
+        "working_mode": job.working_mode,
+        "location": job.location,
+        "salary": job.salary,
+        "description": job.description,
+        "company": job.company,
+        "experience": job.experience,
+        "keypoints": job.keypoints
+
+    };
+
+    // data will be used to generate embeddings
+    json data = {
+        "position": job.position,
+        "category": job.category,
+        "engagement": job.engagement,
+        "working_mode": job.working_mode,
+        "location": job.location,
+        "salary": job.salary,
+        "description": job.description,
+        "company": job.company,
+        "experience": job.experience,
+        "keypoints": job.keypoints
+    };
+    
+    decimal[] embeddings = check getEmbeddings(data.toString());
+    float[] v = [];
+    foreach decimal i in embeddings {
+        v.push(<float>i);
+    }
+        
+    TextEmbeddingMetadata textEmbeddingMetadata = {
+        query: data.toString(),
+        metadata: metadata,
+        embeddings: v
+    };
+    
+    // io:println(result);
+    return textEmbeddingMetadata;
+
 
 }

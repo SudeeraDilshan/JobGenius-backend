@@ -1,3 +1,5 @@
+import ballerinax/pinecone.vector;
+
 public type JobInput record {|
     string position;
     string category;
@@ -55,3 +57,9 @@ public type Filter record{|
 public type S record {|
     string position;
 |};
+
+type TextEmbeddingMetadata record {
+    string query;
+    vector:VectorMetadata metadata;
+    vector:VectorData embeddings;
+};
