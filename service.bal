@@ -90,56 +90,6 @@ service /api on new http:Listener(9090) {
         return http:OK;
     }
 
-    resource function get getAllFields() returns string|error {
-        mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
-
-        stream<string, error?> positionsStream = check jobs->'distinct("category", {}, string);
-        io:println(positionsStream);
-        io:println("rrrrrrrrrr");
-        string[] positions = check from var pos in positionsStream
-            select pos;
-        io:println(positions);
-
-        // var val = positionsStream.next();
-        // while (val is error?) {
-        //     io:println("while loop");
-        //     // io:println(val.value);
-        //     val = positionsStream.next();
-        // }
-        // return from string val in positionsStream select val;
-        return "hi";
-        // stream<anydata, error?> categoriesStream = check jobs->'distinct("category", {}, anydata);
-        // anydata[] categories = check from anydata cat in categoriesStream
-        //     select cat;
-
-        // stream<anydata, error?> engagementsStream = check jobs->'distinct("engagement", {}, anydata);
-        // anydata[] engagements = check from anydata eng in engagementsStream
-        //     select eng;
-
-        // stream<anydata, error?> workingModesStream = check jobs->'distinct("working_mode", {}, anydata);
-        // anydata[] workingModes = check from anydata mode in workingModesStream
-        //     select mode;
-
-        // stream<anydata, error?> locationsStream = check jobs->'distinct("location", {}, anydata);
-        // anydata[] locations = check from anydata loc in locationsStream
-        //     select loc;
-
-        // stream<anydata, error?> companiesStream = check jobs->'distinct("company", {}, anydata);
-        // anydata[] companies = check from anydata comp in companiesStream
-        //     select comp;
-
-        // json result = {
-        //     positions: <json>positions
-        //     // categories: <json>categories,
-        //     // engagements: <json>engagements,
-        //     // workingModes: <json>workingModes,
-        //     // locations: <json>locations,
-        //     // companies: <json>companies
-        // };
-        // io:println(result);
-        // return result;
-    }
-
     resource function get getJobsByCompany(@http:Query string? company = "TechCore") returns json|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
 
@@ -175,8 +125,7 @@ isolated function searchJobs(mongodb:Database JobGeniusDb, Filter filter) return
         engagement: filter.engagement == [] ? {"$ne": -1} : {"$in": filter.engagement},
         working_mode: filter.working_mode == [] ? {"$ne": -1} : {"$in": filter.working_mode},
         location: filter.location == "" ? {"$ne": -1} : {"$eq": filter.location},
-        // salary: filter.salary==()?{"$ne":-1}:{"$gt":filter.salary},
-        company: filter.company == "" ? {"$ne": -1} : {"$in": filter.company}
+        company: filter.company == "" ? {"$ne": -1} : {"$eq": filter.company}
     });
 
     return from Job job in result
