@@ -4,8 +4,12 @@ import ballerina/uuid;
 import ballerinax/mongodb;
 import ballerinax/pinecone.vector;
 import ballerinax/azure.openai.embeddings;
-
+import ballerina/jwt;
 import JobGeniusApp.util;
+import ballerina/crypto;
+import ballerina/auth;
+
+
 
 
 configurable string pineConeApiKey = ?;
@@ -13,6 +17,7 @@ configurable string pineCodeServiceUrl = ?;
 configurable string AzureEmbeddingsApiKey = ?;
 configurable string AzureEmbeddingsServiceUrl = ?;
 configurable string mongodbConnectionUrl = ?;
+configurable string secretKey = ?;
 
 
 
@@ -27,28 +32,39 @@ final embeddings:Client embeddingsClient = check new (
 
 
 
-
-
 mongodb:ConnectionConfig mongoConfig = {
     connection: mongodbConnectionUrl
 };
 
 mongodb:Client mongoDb = check new (mongoConfig);
 
-@http:ServiceConfig {
-    cors: {
-        allowOrigins: ["http://localhost:5173"]
-    }
-}
 
-service /api on new http:Listener(9090) {
+
+listener http:Listener secureEDP = new(
+    port=8080
+
+);
+
+http:FileUserStoreConfig config = {};
+final http:ListenerFileUserStoreBasicAuthHandler handler = new (config);
+
+
+
+
+service /api on secureEDP {
     private final mongodb:Database JobGeniusDb;
+
+    
 
     function init() returns error? {
         string[] dbs = check mongoDb->listDatabaseNames();
         io:println(dbs);
         self.JobGeniusDb = check mongoDb->getDatabase("JobGeniusDb");
     }
+
+
+
+
 
     isolated resource function get jobs(
             @http:Query string[]? category = [],
@@ -147,10 +163,85 @@ service /api on new http:Listener(9090) {
         return jobArray;
     }
 
-    isolated resource function post queryJobs(@http:Payload string text) returns Job[]|error {
+    isolated resource function post queryJobs(@http:Payload string text, @http:Header string Authorization) returns Job[]|error|http:Unauthorized|http:Forbidden {
+        auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
+        if authn is http:Unauthorized {
+            return authn;
+        }
+        http:Forbidden? authz = handler.authorize(<auth:UserDetails>authn, "admin");
+        if authz is http:Forbidden {
+            return authz;
+        }
         return util:queryVectorDb(text, embeddingsClient, pineconeVectorClient);
     }
 
+
+
+    resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns string|error? {
+
+        auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
+        if authn is http:Unauthorized {
+            return error("Unauthorized");
+        }
+        http:Forbidden? authz = handler.authorize(<auth:UserDetails>authn, ["company", "jobseeker"]);
+        if authz is http:Forbidden {
+            return error("Forbidden");
+        }
+        
+    }
+
+
+}
+
+function jwtIssue(string username, string role) returns string|error {
+    jwt:IssuerConfig issuerConfig = {
+        username: username,
+        issuer: "wso2",
+        audience: "vEwzbcasJVQm1jVYHUHCjhxZ4tYa",
+        expTime: 3600,
+        signatureConfig: {
+            config: {
+                keyFile: "private.key"
+            }
+        }
+    };
+
+    return jwt:issue(issuerConfig);
+}
+
+function jwtVerify(string token) returns jwt:Payload|error {
+    jwt:ValidatorConfig validatorConfig = {
+        issuer: "wso2",
+        audience: "vEwzbcasJVQm1jVYHUHCjhxZ4tYa",
+        signatureConfig: {
+            certFile: "public.cert"
+        }
+    };
+    jwt:Payload result = check jwt:validate(token, validatorConfig);
+    return result;
+}
+
+function passwordHash(string password) returns byte[]|error {
+    string input = password;
+    byte[] data = input.toBytes();
+    string secret = secretKey;
+    byte[] key = secret.toBytes();
+    byte[] hmac = check crypto:hmacSha256(data, key);
+    return hmac;
+}
+
+type userCredentials record {
+    string username;
+    string password;
+};
+
+function authenticate(string hash) returns userCredentials|error {
+    [string, string] [username, password] = check auth:extractUsernameAndPassword(hash);
+    userCredentials user = {
+        username: username,
+        password: password
+    };
+    return user;
 }
 
 

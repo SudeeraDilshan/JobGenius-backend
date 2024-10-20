@@ -41,9 +41,6 @@ public type Job record {|
     string keypoints?;
 |};
 
-
-
-
 public type Filter record{|
     string[] position?;
     string[] category?;
@@ -63,3 +60,23 @@ public type TextEmbeddingMetadata record {
     vector:VectorMetadata metadata;
     vector:VectorData embeddings;
 };
+
+
+type NewUser record {
+    string username;
+    string password;
+    string role;
+};
+
+type User record {
+    string id;
+    string username;
+    byte[] password?;
+    string role;
+};
+
+
+    type LoginRequest record {
+        string username;
+        string password;
+    };
