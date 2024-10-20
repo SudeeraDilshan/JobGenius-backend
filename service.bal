@@ -137,8 +137,9 @@ service /api on new http:Listener(9090) {
         return jobArray;
     }
 
-    resource function post queryJobs(@http:Payload string text) returns Job[]|error {
-        return queryVectorDb(text);
+    resource function post queryJobs(@http:Payload json text) returns Job[]|error {
+        string textStr =  text.toString();
+        return queryVectorDb(textStr);
     }
 
 }
