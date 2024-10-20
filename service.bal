@@ -164,9 +164,15 @@ service /api on secureEDP {
         return util:queryVectorDb(text, embeddingsClient, pineconeVectorClient);
     }
 
-    resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns string|error|http:Unauthorized|http:Forbidden|http:Ok {
+    resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns json|error|http:Unauthorized|http:Forbidden|http:Ok {
         check authenticatior(Authorization, ["company", "jobseeker"]);
-        return "Login successful";
+        auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
+        if authn is http:Unauthorized {
+            return error("Unauthorized");
+        }else{
+            io:println(authn.username);
+            return {name:authn.username, scope:authn.scopes}.toJson();
+        }
     }
 }
 
