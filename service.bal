@@ -5,6 +5,8 @@ import ballerinax/mongodb;
 import ballerinax/pinecone.vector;
 import ballerinax/azure.openai.embeddings;
 
+import JobGeniusApp.util;
+
 
 configurable string pineConeApiKey = ?;
 configurable string pineCodeServiceUrl = ?;
@@ -14,7 +16,7 @@ configurable string mongodbConnectionUrl = ?;
 
 
 
-vector:Client pineconeVectorClient = check new ({
+final vector:Client pineconeVectorClient = check new ({
     apiKey: pineConeApiKey
 }, serviceUrl = pineCodeServiceUrl);
 
@@ -22,6 +24,8 @@ final embeddings:Client embeddingsClient = check new (
     config = {auth: {apiKey: AzureEmbeddingsApiKey}},
     serviceUrl = AzureEmbeddingsServiceUrl
 );
+
+
 
 
 
@@ -46,7 +50,7 @@ service /api on new http:Listener(9090) {
         self.JobGeniusDb = check mongoDb->getDatabase("JobGeniusDb");
     }
 
-    resource function get jobs(
+    isolated resource function get jobs(
             @http:Query string[]? category = [],
             // @http:Query int? salary=0,
             @http:Query string[]? position = [],
@@ -66,10 +70,10 @@ service /api on new http:Listener(9090) {
             company: company
         };
 
-        return searchJobs(self.JobGeniusDb, filter);
+        return util:searchJobs(self.JobGeniusDb, filter);
     }
 
-    resource function post jobs(@http:Payload JobInput jobInput) returns Job|error {
+    isolated resource function post jobs(@http:Payload JobInput jobInput) returns Job|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
 
         string id = uuid:createType1AsString();
@@ -90,36 +94,42 @@ service /api on new http:Listener(9090) {
             keypoints: "Java, Spring Boot, Microservices"
         };
 
-        TextEmbeddingMetadata jobText = check generateTextForEmbeddings(job);
+        TextEmbeddingMetadata jobText = check util:generateTextForEmbeddings(job, embeddingsClient);
 
-        check addVectorToPinecone([jobText]);
+        check util:addVectorToPinecone([jobText], pineconeVectorClient);
 
         io:println(job);
         check jobs->insertOne(job);
         return job;
     }
 
-    resource function get jobs/[string id]() returns Job|error {
-        return getJob(self.JobGeniusDb, id);
+    isolated  resource function get jobs/[string id]() returns Job|error {
+        return util:getJob(self.JobGeniusDb, id);
     }
 
-    resource function put jobs/[string id](@http:Payload JobUpdate jobUpdate) returns Job|error {
+    isolated resource function put jobs/[string id](@http:Payload JobUpdate jobUpdate) returns Job|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
 
         mongodb:UpdateResult updateResult = check jobs->updateOne({id}, {set: jobUpdate});
         if updateResult.modifiedCount != 1 {
             return error(string `Failed to update the job with id ${id}`);
         }
-        return getJob(self.JobGeniusDb, id);
+        return util:getJob(self.JobGeniusDb, id);
     }
 
-    resource function delete jobs/[string id]() returns http:Ok|error {
+    isolated resource function delete jobs/[string id]() returns vector:DeleteResponse|http:Ok|error {
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
-        var deleteResult = check jobs->deleteOne({id: id});
+
+        //delete from mongodb
+        var deleteResult = check jobs->deleteOne({id: id});   
+
+        //delete from pinecone 
+        vector:DeleteResponse delVec = check util:deleteJobFromPinecone(id, pineconeVectorClient);
         if (deleteResult.deletedCount == 0) {
             return error("Failed to delete the job with id " + id);
         }
-        return http:OK;
+
+        return delVec;
     }
 
     resource function get getJobsByCompany(@http:Query string? company = "TechCore") returns json|error {
@@ -279,15 +289,8 @@ isolated function generateTextForEmbeddings(Job job) returns TextEmbeddingMetada
     foreach decimal i in embeddings {
         v.push(<float>i);
     }
-        
-    TextEmbeddingMetadata textEmbeddingMetadata = {
-        query: data.toString(),
-        metadata: metadata,
-        embeddings: v
-    };
-    
-    // io:println(result);
-    return textEmbeddingMetadata;
-
 
 }
+
+
+
