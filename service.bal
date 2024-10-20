@@ -4,9 +4,7 @@ import ballerina/uuid;
 import ballerinax/mongodb;
 import ballerinax/pinecone.vector;
 import ballerinax/azure.openai.embeddings;
-import ballerina/jwt;
 import JobGeniusApp.util;
-import ballerina/crypto;
 import ballerina/auth;
 
 
@@ -61,20 +59,17 @@ service /api on secureEDP {
         io:println(dbs);
         self.JobGeniusDb = check mongoDb->getDatabase("JobGeniusDb");
     }
-
-
-
-
-
     isolated resource function get jobs(
-            @http:Query string[]? category = [],
-            // @http:Query int? salary=0,
-            @http:Query string[]? position = [],
-            @http:Query string[]? engagement = [],
-            @http:Query string[]? working_mode = [],
-            @http:Query string? location = "",
-            @http:Query string? company = ""
+        @http:Header string Authorization,
+        @http:Query string[]? category = [],
+        // @http:Query int? salary=0,
+        @http:Query string[]? position = [],
+        @http:Query string[]? engagement = [],
+        @http:Query string[]? working_mode = [],
+        @http:Query string? location = "",
+        @http:Query string? company = ""
     ) returns Job[]|error {
+        check authenticatior(Authorization, ["company", "jobseeker"]);
         // io:println(filter)
         Filter filter = {
             category: category,
@@ -89,7 +84,8 @@ service /api on secureEDP {
         return util:searchJobs(self.JobGeniusDb, filter);
     }
 
-    isolated resource function post jobs(@http:Payload JobInput jobInput) returns Job|error {
+    isolated resource function post jobs(@http:Header string Authorization, @http:Payload JobInput jobInput) returns Job|error {
+        check authenticatior(Authorization, ["company"]);
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
 
         string id = uuid:createType1AsString();
@@ -119,7 +115,8 @@ service /api on secureEDP {
         return job;
     }
 
-    isolated  resource function get jobs/[string id]() returns Job|error {
+    isolated  resource function get jobs/[string id](@http:Header string Authorization) returns Job|error {
+        check authenticatior(Authorization, ["jobseeker"]);
         return util:getJob(self.JobGeniusDb, id);
     }
 
@@ -133,7 +130,10 @@ service /api on secureEDP {
         return util:getJob(self.JobGeniusDb, id);
     }
 
-    isolated resource function delete jobs/[string id]() returns vector:DeleteResponse|http:Ok|error {
+    isolated resource function delete jobs/[string id](@http:Header string Authorization) returns vector:DeleteResponse|http:Ok|error {
+
+        check authenticatior(Authorization, ["company"]);
+
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
 
         //delete from mongodb
@@ -144,103 +144,42 @@ service /api on secureEDP {
         if (deleteResult.deletedCount == 0) {
             return error("Failed to delete the job with id " + id);
         }
-
         return delVec;
     }
 
-    resource function get getJobsByCompany(@http:Query string? company = "TechCore") returns json|error {
+    resource function get getJobsByCompany(@http:Header string Authorization, @http:Query string? company = "TechCore") returns json|error {
+        check authenticatior(Authorization, ["company"]);
         mongodb:Collection jobs = check self.JobGeniusDb->getCollection("Jobs");
-
         stream<Job, error?> jobsStream = check jobs->find({company: company});
         json[] jobArray = [];
-
         check jobsStream.forEach(function(Job job) {
             jobArray.push(job);
         });
-
         check jobsStream.close();
-
         return jobArray;
     }
 
     isolated resource function post queryJobs(@http:Payload string text, @http:Header string Authorization) returns Job[]|error|http:Unauthorized|http:Forbidden {
-        auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
-        if authn is http:Unauthorized {
-            return authn;
-        }
-        http:Forbidden? authz = handler.authorize(<auth:UserDetails>authn, "admin");
-        if authz is http:Forbidden {
-            return authz;
-        }
+        check authenticatior(Authorization, ["company"]);
         return util:queryVectorDb(text, embeddingsClient, pineconeVectorClient);
     }
 
-
-
-    resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns string|error? {
-
-        auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
-        if authn is http:Unauthorized {
-            return error("Unauthorized");
-        }
-        http:Forbidden? authz = handler.authorize(<auth:UserDetails>authn, ["company", "jobseeker"]);
-        if authz is http:Forbidden {
-            return error("Forbidden");
-        }
-
+    resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns string|error|http:Unauthorized|http:Forbidden|http:Ok {
+        check authenticatior(Authorization, ["company", "jobseeker"]);
+        return "Login successful";
     }
 }
 
-function jwtIssue(string username, string role) returns string|error {
-    jwt:IssuerConfig issuerConfig = {
-        username: username,
-        issuer: "wso2",
-        audience: "vEwzbcasJVQm1jVYHUHCjhxZ4tYa",
-        expTime: 3600,
-        signatureConfig: {
-            config: {
-                keyFile: "private.key"
-            }
-        }
-    };
 
-    return jwt:issue(issuerConfig);
+// authenticator function
+isolated function authenticatior(@http:Header string Authorization, string[] scope) returns error? {
+    auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
+    if authn is http:Unauthorized {
+        return error("Unauthorized");
+    }
+    http:Forbidden? authz = handler.authorize(<auth:UserDetails>authn, scope);
+    if authz is http:Forbidden {
+        return error("Forbidden");
+    }
+    return;
 }
-
-function jwtVerify(string token) returns jwt:Payload|error {
-    jwt:ValidatorConfig validatorConfig = {
-        issuer: "wso2",
-        audience: "vEwzbcasJVQm1jVYHUHCjhxZ4tYa",
-        signatureConfig: {
-            certFile: "public.cert"
-        }
-    };
-    jwt:Payload result = check jwt:validate(token, validatorConfig);
-    return result;
-}
-
-function passwordHash(string password) returns byte[]|error {
-    string input = password;
-    byte[] data = input.toBytes();
-    string secret = secretKey;
-    byte[] key = secret.toBytes();
-    byte[] hmac = check crypto:hmacSha256(data, key);
-    return hmac;
-}
-
-type userCredentials record {
-    string username;
-    string password;
-};
-
-function authenticate(string hash) returns userCredentials|error {
-    [string, string] [username, password] = check auth:extractUsernameAndPassword(hash);
-    userCredentials user = {
-        username: username,
-        password: password
-    };
-    return user;
-}
-
-
-

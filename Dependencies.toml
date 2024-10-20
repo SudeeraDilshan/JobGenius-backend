@@ -49,9 +49,6 @@ dependencies = [
 	{org = "ballerina", name = "jballerina.java"},
 	{org = "ballerina", name = "time"}
 ]
-modules = [
-	{org = "ballerina", packageName = "crypto", moduleName = "crypto"}
-]
 
 [[package]]
 org = "ballerina"
@@ -126,9 +123,6 @@ dependencies = [
 	{org = "ballerina", name = "lang.string"},
 	{org = "ballerina", name = "log"},
 	{org = "ballerina", name = "time"}
-]
-modules = [
-	{org = "ballerina", packageName = "jwt", moduleName = "jwt"}
 ]
 
 [[package]]
@@ -378,10 +372,8 @@ name = "JobGeniusApp"
 version = "0.1.0"
 dependencies = [
 	{org = "ballerina", name = "auth"},
-	{org = "ballerina", name = "crypto"},
 	{org = "ballerina", name = "http"},
 	{org = "ballerina", name = "io"},
-	{org = "ballerina", name = "jwt"},
 	{org = "ballerina", name = "test"},
 	{org = "ballerina", name = "uuid"},
 	{org = "ballerinai", name = "observe"},
