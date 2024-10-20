@@ -159,9 +159,10 @@ service /api on secureEDP {
         return jobArray;
     }
 
-    isolated resource function post queryJobs(@http:Payload string text, @http:Header string Authorization) returns Job[]|error|http:Unauthorized|http:Forbidden {
+    isolated resource function post queryJobs(@http:Payload json text, @http:Header string Authorization) returns Job[]|error|http:Unauthorized|http:Forbidden {
+        string textStr = text.toString();
         check authenticatior(Authorization, ["company"]);
-        return util:queryVectorDb(text, embeddingsClient, pineconeVectorClient);
+        return util:queryVectorDb(textStr, embeddingsClient, pineconeVectorClient);
     }
 
     resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns json|error|http:Unauthorized|http:Forbidden|http:Ok {
