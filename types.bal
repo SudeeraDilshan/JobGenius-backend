@@ -58,7 +58,7 @@ public type S record {|
     string position;
 |};
 
-type TextEmbeddingMetadata record {
+public type TextEmbeddingMetadata record {
     string query;
     vector:VectorMetadata metadata;
     vector:VectorData embeddings;
