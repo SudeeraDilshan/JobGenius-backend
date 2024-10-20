@@ -112,12 +112,6 @@ public isolated  function getEmbeddings(string query, embeddings:Client embeddin
     return embeddingsResult.data[0].embedding;
 }
 
-// function queryByID(string id) returns string|error{
-//     vector:QueryResponse queryResponse = check pineconeVectorClient->/query.post({"metadata": {id: id}, topK: 1, includeMetadata: true});
-//     json[] data = check queryResponse.matches.toJson().ensureType();
-//     string id2 = check data[0].metadata.id;
-//     return id2;
-// }
 
 public isolated  function generateTextForEmbeddings(Job job, embeddings:Client embeddingsClient) returns TextEmbeddingMetadata|error {
 
