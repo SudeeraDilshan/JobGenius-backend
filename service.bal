@@ -187,10 +187,8 @@ service /api on secureEDP {
         if authz is http:Forbidden {
             return error("Forbidden");
         }
-        
+
     }
-
-
 }
 
 function jwtIssue(string username, string role) returns string|error {
