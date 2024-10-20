@@ -147,8 +147,9 @@ service /api on new http:Listener(9090) {
         return jobArray;
     }
 
-    isolated resource function post queryJobs(@http:Payload string text) returns Job[]|error {
-        return util:queryVectorDb(text, embeddingsClient, pineconeVectorClient);
+    isolated resource function post queryJobs(@http:Payload json text) returns Job[]|error {
+        string textStr =  text.toString();
+        return util:queryVectorDb(textStr, embeddingsClient, pineconeVectorClient);
     }
 
 }
