@@ -8,14 +8,12 @@ import JobGeniusApp.util;
 import ballerina/auth;
 
 
-
-
 configurable string pineConeApiKey = ?;
 configurable string pineCodeServiceUrl = ?;
 configurable string AzureEmbeddingsApiKey = ?;
 configurable string AzureEmbeddingsServiceUrl = ?;
 configurable string mongodbConnectionUrl = ?;
-configurable string secretKey = ?;
+// configurable string secretKey = ?;
 
 
 
@@ -47,7 +45,11 @@ http:FileUserStoreConfig config = {};
 final http:ListenerFileUserStoreBasicAuthHandler handler = new (config);
 
 
-
+@http:ServiceConfig {
+    cors: {
+        allowOrigins: ["http://localhost:5173"]
+    }
+}
 
 service /api on secureEDP {
     private final mongodb:Database JobGeniusDb;
@@ -159,12 +161,14 @@ service /api on secureEDP {
         return jobArray;
     }
 
-    isolated resource function post queryJobs(@http:Payload string text, @http:Header string Authorization) returns Job[]|error|http:Unauthorized|http:Forbidden {
-        check authenticatior(Authorization, ["company"]);
-        return util:queryVectorDb(text, embeddingsClient, pineconeVectorClient);
+    isolated resource function post queryJobs(@http:Payload json text) returns Job[]|error {
+        string textStr = text.toString();
+        // check authenticatior(Authorization, ["company"]);
+        return util:queryVectorDb(textStr, embeddingsClient, pineconeVectorClient);
     }
 
     resource function post login(@http:Payload LoginRequest loginrequest, @http:Header string Authorization) returns json|error|http:Unauthorized|http:Forbidden|http:Ok {
+        // io:println("hhhh");
         check authenticatior(Authorization, ["company", "jobseeker"]);
         auth:UserDetails|http:Unauthorized authn = handler.authenticate(Authorization);
         if authn is http:Unauthorized {
